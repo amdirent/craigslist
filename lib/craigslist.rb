@@ -33,8 +33,6 @@ module Craigslist
             post.css('p.row a').each do |plink|
               if plink['href'].include?('craigslist')
                 results[plink['href']] = plink.parent.text.strip
-              else
-                results["#{link['href'].chomp('/')}#{plink['href']}"] = plink.parent.text.strip
               end
             end
           end
@@ -62,7 +60,6 @@ module Craigslist
 
     page = Nokogiri::HTML(open(url))
 
-    post[:posting_id] = url.split('/').last.split('.')[0]
     post[:posted_on] = DateTime.parse(page.css('p.postinginfo time')[0]['datetime'])
     post[:posted_on] = Time.parse(page.css('time')[0]['datetime']).to_s
     post[:title] = page.css('h2.postingtitle')[0].text.strip
