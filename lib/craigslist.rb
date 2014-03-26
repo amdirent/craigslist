@@ -58,7 +58,12 @@ module Craigslist
 
 	def self.parse_post(url)
 	  post = {}
-	  doc = open(url) { |d| Hpricot(d.read.encode("UTF-8")) }
+
+    #if utf
+      doc = open(url) { |d| Hpricot(d.read.encode("UTF-8")) }
+    #else
+    #  doc = open(url) { |d| Hpricot(d) }
+    #end
 
 		doc.at("body").inner_html.each_line do |line|
 			if line =~ /Posted:/
@@ -79,10 +84,10 @@ module Craigslist
 		  end
 
 		  if line =~ /Compensation:/
-			  line = line.match(/-->.+<!--/)[0]
-			  line.gsub!("-->", '')
-			  line.gsub!("<!--", '')
-			  line.gsub!("Compensation:", '')
+			  # line = line.match(/-->.+<!--/)[0]
+			  # line.gsub!("-->", '')
+			  # line.gsub!("<!--", '')
+			  # line.gsub!("Compensation:", '')
 			  post[:budget] = Helper.instance.strip_tags(line).strip
 		  end
 		end
