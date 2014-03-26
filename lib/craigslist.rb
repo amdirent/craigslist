@@ -1,8 +1,9 @@
 require "craigslist/version"
-require "open-uri"
 require "action_view"
-require "hpricot"
 require "uri"
+require "time"
+require "open-uri"
+require "nokogiri"
 
 module Craigslist
 
@@ -25,18 +26,18 @@ module Craigslist
 		states.each do |state|
 			threads << Thread.new(state) do |s|
 			  begin
-    			doc = open(base_url + state) { |f| Hpricot(f) }
-    			doc.search("//div[@id='list']/a").each do |link|
-    				url = "#{link[:href]}search/#{term}"
-    				post = open(url) { |p| Hpricot(p) }
-    				post.search("//p[@class='row']/a").each do |plink|
-              if plink[:href].include?('craigslist')
-                results[plink[:href]] = plink.parent.inner_text
+          page = Nokogiri::HTML(open(base_url + state))
+          page.css('div#list a').each do |link|
+            url = "#{link['href']}search/#{term}"
+            post = Nokogiri::HTML(open(url))
+            post.css('p.row a').each do |plink|
+              if plink['href'].include?('craigslist')
+                results[plink['href']] = plink.parent.text.strip
               else
-                results["#{link[:href].chomp('/')}#{plink[:href]}"] = plink.parent.inner_text
+                results["#{link['href'].chomp('/')}#{plink['href']}"] = plink.parent.text.strip
               end
-    			  end
-    			end
+            end
+          end
         rescue OpenURI::HTTPError => e
           logger.error e.message
         rescue RuntimeError => e
@@ -51,53 +52,37 @@ module Craigslist
 
   def self.extract_email(url)
     uri = URI(url)
-    posting_id = url.split('/')[4].split('.')[0]
-    doc = open("http://#{uri.host}/reply/#{posting_id}") { |d| Hpricot(d) }
-    doc.search("a[text()*='@']").first.inner_text
+    posting_id = url.split('/').last.split('.')[0]
+    page = Nokogiri::HTML(open("http://#{uri.host}/reply/#{posting_id}"))
+    page.css('a.mailto').text.strip
   end
 
 	def self.parse_post(url)
 	  post = {}
 
-    #if utf
-      doc = open(url) { |d| Hpricot(d.read.encode("UTF-8")) }
-    #else
-    #  doc = open(url) { |d| Hpricot(d) }
-    #end
+    page = Nokogiri::HTML(open(url))
 
-		doc.at("body").inner_html.each_line do |line|
-			if line =~ /Posted:/
-				line.gsub!("<br />", '')
-				line.gsub!("Posted:", '')
-				post[:posted_on] = DateTime.parse(line.to_s)
-			end
+    post[:posting_id] = url.split('/').last.split('.')[0]
+    post[:posted_on] = DateTime.parse(page.css('p.postinginfo time')[0]['datetime'])
+    post[:posted_on] = Time.parse(page.css('time')[0]['datetime']).to_s
+    post[:title] = page.css('h2.postingtitle')[0].text.strip
+    post[:message] = page.css('section#postingbody').text.strip
+    post[:email] = extract_email(url).strip
+    post[:url] = url
 
-			if line =~ /Posting ID:/
-			  line.gsub!("<br />", "")
-			  line.gsub!("Posting ID: ", '')
-			  post[:posting_id] = Helper.instance.strip_tags(line).strip
-		  end
+    page.css('ul.blurbs').each do |li|
+      if li.text =~ /Location:/
+        loc = li.text.split("Location: ")[1]
+        post[:location] = Helper.instance.strip_tags(loc).strip
+      end
 
-		  if line =~ /Location:/
-			  line = line.split("Location: ")[1]
-			  post[:location] = Helper.instance.strip_tags(line).strip
-		  end
+      if li.text =~ /Compensation:/
+        comp = li.text.split("Compensation: ")[1]
+        post[:budget] = Helper.instance.strip_tags(comp).strip
+      end
+    end
 
-		  if line =~ /Compensation:/
-			  # line = line.match(/-->.+<!--/)[0]
-			  # line.gsub!("-->", '')
-			  # line.gsub!("<!--", '')
-			  # line.gsub!("Compensation:", '')
-			  post[:budget] = Helper.instance.strip_tags(line).strip
-		  end
-		end
-
-	  post[:title] = (doc/"h2.postingtitle").first.inner_text.strip
-		post[:message] = (doc/"section#postingbody").inner_text.strip
-	  post[:email] = extract_email(url).strip
-	  post[:url] = url
-
-		post
+    return post
   end
 
 end
