@@ -27,10 +27,10 @@ module Craigslist
 			threads << Thread.new(state) do |s|
 			  begin
           url = base_url + state
-          page = Nokogiri::HTML(open(url))
+          page = Nokogiri::HTML(open(url, :read_timeout=>nil))
           page.css('div#list a').each do |link|
             url = "#{link['href']}search/#{term}"
-            post = Nokogiri::HTML(open(url))
+            post = Nokogiri::HTML(open(url, :read_timeout=>nil))
             post.css('p.row a').each do |plink|
               if plink['href'].include?('craigslist')
                 results[plink['href']] = plink.parent.text.strip
