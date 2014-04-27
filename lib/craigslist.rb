@@ -26,7 +26,8 @@ module Craigslist
 		states.each do |state|
 			threads << Thread.new(state) do |s|
 			  begin
-          page = Nokogiri::HTML(open(base_url + state))
+          url = base_url + state
+          page = Nokogiri::HTML(open(url))
           page.css('div#list a').each do |link|
             url = "#{link['href']}search/#{term}"
             post = Nokogiri::HTML(open(url))
@@ -37,9 +38,9 @@ module Craigslist
             end
           end
         rescue OpenURI::HTTPError => e
-          logger.error e.message
+          puts e.message
         rescue RuntimeError => e
-          logger.error e.message
+          puts e.message
         end
 			end
 		end
