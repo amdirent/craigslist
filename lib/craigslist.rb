@@ -22,9 +22,9 @@ module Craigslist
 		base_url = 'http://geo.craigslist.org/iso/us/'
 		states ||= %w{al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms md mt ne nv nh nj nm ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy}
 
-		threads = []
+		pool = Thread.pool(3)
 		states.each do |state|
-			threads << Thread.new(state) do |s|
+			pool.process {
 			  begin
           url = base_url + state
           page = Nokogiri::HTML(open(url, :read_timeout=>nil))
@@ -42,10 +42,10 @@ module Craigslist
         rescue RuntimeError => e
           puts e.message
         end
-			end
+			}
 		end
 
-		threads.each { |t| t.join } # Make sure the threads finish
+		pool.shutdown
 		results
 	end
 
