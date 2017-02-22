@@ -50,14 +50,14 @@ city_urls.each do |city_url|
         results[url] = post.text.strip
       end
 
-      next_link = page.xpath('//a[contains(@class, "next")]/@href').first
+      next_link = page.css('.paginator:not(.lastpage) a.next').first
 
       p "Pulled #{board_url} ; having a nap."
 
       break if next_link.nil?
 
       previous_url = board_url
-      board_url = "#{city_url}#{next_link.value.sub(/^\//, '')}"
+      board_url = "#{city_url}#{next_link['href'].sub(/^\//, '')}"
     end
   end
 
