@@ -1,0 +1,77 @@
+#!/usr/bin/env ruby
+
+require 'bundler'
+
+Bundler.require(:default)
+
+require 'open-uri'
+require 'yaml'
+
+boards = %w{ eng sof cpg }
+root = File.expand_path(File.dirname(__FILE__))
+config = YAML.load_file(File.join(root, 'config.yml'))
+
+pg = PG.connect(config['database'])
+
+# Spider US cities from the list (xPath //div[@class="colmask"][1]//a/@href)
+city_urls = pg.exec('SELECT url FROM city_boards').map { |r| r['url'] }
+
+results = {}
+
+# Spider the cpg, sof, and eng boards
+city_urls.each do |city_url|
+  boards.each do |board|
+    board_url = "#{city_url}search/#{board}"
+
+    loop do
+      sleep(Random.rand(5..7))
+      page = begin
+               Nokogiri::HTML(open(board_url))
+             rescue
+               p "Unable to pull #{board_url}"
+               break
+             end
+
+      page.xpath('//a[contains(@class, "result-title")]').map do |post|
+        url = post['href']
+
+        # normalize url
+        if url[0..1] == '//'
+          url = url.split('/').drop(3).join('/')
+        elsif url[0] == '/'
+          url = url[1..url.length]
+        end
+
+        url = city_url + url
+
+        results[url] = post.text.strip
+      end
+
+      next_link = page.xpath('//a[contains(@class, "next")]/@href').first
+
+      break if next_link.nil?
+
+      board_url = "#{city_url}#{next_link.value.sub(/^\//, '')}"
+    end
+  end
+
+  placeholder_int = 0
+  placeholders = []
+  values = []
+  results.each do |(url, title)|
+    placeholders << "($#{placeholder_int += 1},$#{placeholder_int += 1})"
+    values += [url, title]
+  end
+
+  query = "INSERT INTO posts (url, title) VALUES #{placeholders.join(',')} ON CONFLICT DO NOTHING"
+
+  pg.exec_params(query, values)
+end
+
+# Look for titles matching some criteria
+
+# Pull post body for posts matching the above
+
+# Scrape contact information out of the post body (if possible)
+
+# Store url, post title, post body, and contact information in database

@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+
+require 'bundler'
+Bundler.require(:default)
+
+require 'open-uri'
+require 'yaml'
+
+root = File.expand_path(File.dirname(__FILE__))
+config = YAML.load_file(File.join(root, 'config.yml'))
+
+pg = PG.connect(config['database'])
+
+home_page = Nokogiri::HTML(open('https://www.craigslist.org/about/sites'))
+city_urls = home_page.xpath('//div[@class="colmask"][1]//a/@href').map(&:value)
+
+query = "INSERT INTO city_boards VALUES #{city_urls.size.times.map { |i| "($#{i+1})" }.join(',')} ON CONFLICT DO NOTHING"
+
+pg.exec_params(query, city_urls)

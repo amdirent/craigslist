@@ -1,0 +1,65 @@
+#!/usr/bin/env ruby
+
+require 'bundler'
+
+Bundler.require(:default)
+
+require 'open-uri'
+require 'uri'
+require 'yaml'
+
+root = File.expand_path(File.dirname(__FILE__))
+config = YAML.load_file(File.join(root, 'config.yml'))
+
+pg = PG.connect(config['database'])
+pg.prepare('update', 'UPDATE posts SET body = $2, body_ts = to_tsvector($2), contact_email = $3, contact_phone = $4 WHERE id = $1')
+pg.prepare('delete', 'DELETE FROM posts WHERE id = $1')
+
+posts_to_scrape = pg.exec('SELECT id, url FROM posts WHERE body IS NULL');
+posts_to_scrape.each do |post|
+  host = begin
+           URI.parse(post['url']).host
+         end
+
+  page = begin
+           Nokogiri::HTML(open(post['url']))
+         rescue
+           p "Unable to open #{post['url']}"
+           pg.exec_prepared('delete', [post['id']])
+           next
+         end
+
+  post_body = page.css('#postingbody').first.text.strip
+  reply_link = page.css('#replylink').first
+
+  reply_uri = begin
+                URI.parse(reply_link['href'])   
+              rescue
+                p "No reply info found for #{post['url']}"
+                # pg.exec_prepared('delete', [post['id']])
+                next
+              end
+  reply_uri.scheme = 'https'
+  reply_uri.host ||= host
+
+  reply_data = Nokogiri::HTML(Typhoeus.get(reply_uri.to_s, headers: { 'Referer' => post['url'] }).body)
+  reply_email = reply_data.css('.reply-email-address a').first.text rescue nil
+  reply_phone = begin
+                  reply_data.css('.reply-tel-link').first['href'].gsub(/\D/, '')
+                rescue
+                  begin
+                    reply_data.css('.reply-tel-number').first.text.gsub(/\D/, '')
+                  rescue
+                    nil
+                  end
+                end
+
+  if reply_email.nil? and reply_phone.nil?
+    p "No contact details found for #{post['url']}"
+    # pg.exec_prepared('delete', [post['id']])
+    next
+  end
+
+  pg.exec_prepared('update', [post['id'], post_body, reply_email, reply_phone])
+  sleep(Random.rand(5..7))
+end
