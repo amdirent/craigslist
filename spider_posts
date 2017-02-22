@@ -4,7 +4,8 @@ require 'bundler'
 
 Bundler.require(:default)
 
-require 'open-uri'
+Typhoeus::Config.user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'
+
 require 'yaml'
 
 boards = %w{ eng sof cpg }
@@ -21,12 +22,14 @@ results = {}
 # Spider the cpg, sof, and eng boards
 city_urls.each do |city_url|
   boards.each do |board|
+    previous_url = city_url
     board_url = "#{city_url}search/#{board}"
 
     loop do
-      sleep(Random.rand(5..7))
+      sleep(Random.rand(10..25))
+
       page = begin
-               Nokogiri::HTML(open(board_url))
+               Nokogiri::HTML(Typhoeus.get(board_url, headers: { 'Referer' => previous_url }).body)
              rescue
                p "Unable to pull #{board_url}"
                break
@@ -49,8 +52,11 @@ city_urls.each do |city_url|
 
       next_link = page.xpath('//a[contains(@class, "next")]/@href').first
 
+      p "Pulled #{board_url} ; having a nap."
+
       break if next_link.nil?
 
+      previous_url = board_url
       board_url = "#{city_url}#{next_link.value.sub(/^\//, '')}"
     end
   end

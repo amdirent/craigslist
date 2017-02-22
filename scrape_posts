@@ -4,9 +4,10 @@ require 'bundler'
 
 Bundler.require(:default)
 
-require 'open-uri'
 require 'uri'
 require 'yaml'
+
+Typhoeus::Config.user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'
 
 root = File.expand_path(File.dirname(__FILE__))
 config = YAML.load_file(File.join(root, 'config.yml'))
@@ -22,7 +23,7 @@ posts_to_scrape.each do |post|
          end
 
   page = begin
-           Nokogiri::HTML(open(post['url']))
+           Nokogiri::HTML(Typhoeus.get(post['url']).body)
          rescue
            p "Unable to open #{post['url']}"
            pg.exec_prepared('delete', [post['id']])
