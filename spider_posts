@@ -15,7 +15,7 @@ config = YAML.load_file(File.join(root, 'config.yml'))
 pg = PG.connect(config['database'])
 
 # Spider US cities from the list (xPath //div[@class="colmask"][1]//a/@href)
-city_urls = pg.exec('SELECT url FROM city_boards').map { |r| r['url'] }
+city_urls = pg.exec('SELECT url FROM city_boards ORDER BY random()').map { |r| r['url'] }
 
 results = {}
 
