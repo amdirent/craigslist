@@ -7,7 +7,7 @@ module Utils
     def get_page(url, headers={})
       nap
 
-      response = Typhoeus.get(board_url, headers: { 'Referer' => previous_url })
+      response = Typhoeus.get(url, followlocation: true, headers: headers)
 
       unless response.success?
         if response.response_code == 403

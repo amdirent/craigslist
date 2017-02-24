@@ -13,7 +13,8 @@ class Spider
       loop do
         page = begin
                  Nokogiri::HTML(Utils.get_page(board_url, { 'Referer' => previous_url }))
-               rescue
+               rescue => e
+                 p "#{e.class}: #{e.message}"
                  p "Unable to pull #{board_url}"
                  break
                end

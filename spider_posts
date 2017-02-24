@@ -5,6 +5,7 @@ require 'bundler'
 Bundler.require(:default)
 
 require_relative 'lib/spider'
+require_relative 'lib/scraper'
 
 Typhoeus::Config.user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'
 
@@ -15,26 +16,23 @@ config = YAML.load_file(File.join(root, 'config.yml'))
 
 pg = PG.connect(config['database'])
 
+pg.prepare('insert', 'INSERT INTO posts (url, title, body, body_ts, contact_email, contact_phone)
+                      VALUES ($1, $2, $3, to_tsvector($3), $4, $5) ON CONFLICT DO NOTHING')
+
 city_urls = pg.exec('SELECT url FROM city_boards ORDER BY random()').map { |r| r['url'] }
 
-results = {}
-
 city_urls.each do |city_url|
+  p "Crawling #{city_url}"
+
   Spider.crawl(city_url) do |post_url, post_title, referer|
-    results[post_url] = {
-      title: post_title
-    }
+    already_scrapped = pg.exec_params('SELECT 1 FROM posts WHERE url = $1', [post_url]).first
+
+    next if already_scrapped
+
+    body, email, phone = Scraper.scrape(post_url, { 'Referer' => referer })
+
+    p "Storing data for #{post_url}"
+
+    pg.exec_prepared('insert', [post_url, post_title, body, email, phone])
   end
-
-  placeholder_int = 0
-  placeholders = []
-  values = []
-  results.each do |(url, data)|
-    placeholders << "($#{placeholder_int += 1},$#{placeholder_int += 1})"
-    values += [url, data[:title]]
-  end
-
-  query = "INSERT INTO posts (url, title) VALUES #{placeholders.join(',')} ON CONFLICT DO NOTHING"
-
-  pg.exec_params(query, values)
 end
