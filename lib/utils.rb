@@ -1,7 +1,7 @@
 module Utils
   class << self
     def nap(time=:random)
-      sleep(time == :random ? Random.rand(10..25) : time)
+      sleep(time == :random ? Random.rand(10..15) : time)
     end
 
     def get_page(url, headers={})
