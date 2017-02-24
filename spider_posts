@@ -11,17 +11,18 @@ Typhoeus::Config.user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWe
 
 require 'yaml'
 
-root = File.expand_path(File.dirname(__FILE__))
-config = YAML.load_file(File.join(root, 'config.yml'))
+pg = PG.connect(host:     ENV['DATABASE_HOST'],
+                port:     ENV.fetch('DATABASE_PORT', 5432).to_i,
+                dbname:   ENV['DATABASE_NAME'],
+                user:     ENV['DATABASE_USER'],
+                password: ENV['DATABASE_PASS']
+               )
 
-pg = PG.connect(config['database'])
 
 pg.prepare('insert', 'INSERT INTO posts (url, title, body, body_ts, contact_email, contact_phone)
                       VALUES ($1, $2, $3, to_tsvector($3), $4, $5) ON CONFLICT DO NOTHING')
 
-city_urls = pg.exec('SELECT url FROM city_boards ORDER BY random()').map { |r| r['url'] }
-
-city_urls.each do |city_url|
+ARGV.each do |city_url|
   p "Crawling #{city_url}"
 
   Spider.crawl(city_url) do |post_url, post_title, referer|
