@@ -19,7 +19,7 @@ class Spider
                  break
                end
 
-        page.css('a.result-title').map do |post|
+        page.css('a.result-title').each do |post|
           uri = URI.parse(post['href'])
           uri.host ||= base_host
           uri.scheme ||= 'https'
