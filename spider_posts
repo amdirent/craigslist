@@ -4,80 +4,35 @@ require 'bundler'
 
 Bundler.require(:default)
 
+require_relative 'lib/spider'
+require_relative 'lib/scraper'
+
 Typhoeus::Config.user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'
 
 require 'yaml'
 
-boards = %w{ eng sof cpg }
 root = File.expand_path(File.dirname(__FILE__))
 config = YAML.load_file(File.join(root, 'config.yml'))
 
 pg = PG.connect(config['database'])
 
-# Spider US cities from the list (xPath //div[@class="colmask"][1]//a/@href)
+pg.prepare('insert', 'INSERT INTO posts (url, title, body, body_ts, contact_email, contact_phone)
+                      VALUES ($1, $2, $3, to_tsvector($3), $4, $5) ON CONFLICT DO NOTHING')
+
 city_urls = pg.exec('SELECT url FROM city_boards ORDER BY random()').map { |r| r['url'] }
 
-results = {}
-
-# Spider the cpg, sof, and eng boards
 city_urls.each do |city_url|
-  boards.each do |board|
-    previous_url = city_url
-    board_url = "#{city_url}search/#{board}"
+  p "Crawling #{city_url}"
 
-    loop do
-      sleep(Random.rand(10..25))
+  Spider.crawl(city_url) do |post_url, post_title, referer|
+    already_scrapped = pg.exec_params('SELECT 1 FROM posts WHERE url = $1', [post_url]).first
 
-      page = begin
-               Nokogiri::HTML(Typhoeus.get(board_url, headers: { 'Referer' => previous_url }).body)
-             rescue
-               p "Unable to pull #{board_url}"
-               break
-             end
+    next if already_scrapped
 
-      page.xpath('//a[contains(@class, "result-title")]').map do |post|
-        url = post['href']
+    body, email, phone = Scraper.scrape(post_url, { 'Referer' => referer })
 
-        # normalize url
-        if url[0..1] == '//'
-          url = url.split('/').drop(3).join('/')
-        elsif url[0] == '/'
-          url = url[1..url.length]
-        end
+    p "Storing data for #{post_url}"
 
-        url = city_url + url
-
-        results[url] = post.text.strip
-      end
-
-      next_link = page.css('.paginator:not(.lastpage) a.next').first
-
-      p "Pulled #{board_url} ; having a nap."
-
-      break if next_link.nil?
-
-      previous_url = board_url
-      board_url = "#{city_url}#{next_link['href'].sub(/^\//, '')}"
-    end
+    pg.exec_prepared('insert', [post_url, post_title, body, email, phone])
   end
-
-  placeholder_int = 0
-  placeholders = []
-  values = []
-  results.each do |(url, title)|
-    placeholders << "($#{placeholder_int += 1},$#{placeholder_int += 1})"
-    values += [url, title]
-  end
-
-  query = "INSERT INTO posts (url, title) VALUES #{placeholders.join(',')} ON CONFLICT DO NOTHING"
-
-  pg.exec_params(query, values)
 end
-
-# Look for titles matching some criteria
-
-# Pull post body for posts matching the above
-
-# Scrape contact information out of the post body (if possible)
-
-# Store url, post title, post body, and contact information in database

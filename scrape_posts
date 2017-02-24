@@ -4,6 +4,8 @@ require 'bundler'
 
 Bundler.require(:default)
 
+require_relative 'lib/scraper'
+
 require 'uri'
 require 'yaml'
 
@@ -18,50 +20,10 @@ pg.prepare('delete', 'DELETE FROM posts WHERE id = $1')
 
 posts_to_scrape = pg.exec('SELECT id, url FROM posts WHERE body IS NULL');
 posts_to_scrape.each do |post|
-  sleep(Random.rand(15..25))
+  post_body, reply_email, reply_phone = Scraper.scrape(post['url'])
 
-  host = URI.parse(post['url']).host
-
-  page = begin
-           res = Typhoeus.get(post['url'])
-           raise unless res.success?
-           Nokogiri::HTML(res.body)
-         rescue
-           p "Unable to open #{post['url']}"
-           pg.exec_prepared('delete', [post['id']])
-           next
-         end
-
-  post_body = page.css('#postingbody').first.text.strip
-  reply_link = page.css('#replylink').first
-
-  reply_uri = begin
-                URI.parse(reply_link['href'])
-              rescue
-                p "No reply info found for #{post['url']}"
-                # pg.exec_prepared('delete', [post['id']])
-                next
-              end
-  reply_uri.scheme = 'https'
-  reply_uri.host ||= host
-
-  sleep(Random.rand(8..15))
-
-  reply_data = Nokogiri::HTML(Typhoeus.get(reply_uri.to_s, headers: { 'Referer' => post['url'] }).body)
-  reply_email = reply_data.css('.reply-email-address a').first.text rescue nil
-  reply_phone = begin
-                  reply_data.css('.reply-tel-link').first['href'].gsub(/\D/, '')
-                rescue
-                  begin
-                    reply_data.css('.reply-tel-number').first.text.gsub(/\D/, '')
-                  rescue
-                    nil
-                  end
-                end
-
-  if reply_email.nil? and reply_phone.nil?
-    p "No contact details found for #{post['url']}"
-    # pg.exec_prepared('delete', [post['id']])
+  if post_body.nil?
+    p "No data for #{post['url']}"
     next
   end
 
