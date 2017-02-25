@@ -19,8 +19,8 @@ pg = PG.connect(host:     ENV['DATABASE_HOST'],
                )
 
 
-pg.prepare('insert', 'INSERT INTO posts (url, title, body, body_ts, contact_email, contact_phone)
-                      VALUES ($1, $2, $3, to_tsvector($3), $4, $5) ON CONFLICT DO NOTHING')
+pg.prepare('insert', 'INSERT INTO posts (url, title, title_ts, body, body_ts, contact_email, contact_phone)
+                      VALUES ($1, $2, to_tsvector($2), $3, to_tsvector($3), $4, $5) ON CONFLICT DO NOTHING')
 
 ARGV.each do |city_url|
   p "Crawling #{city_url}"
