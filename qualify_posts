@@ -22,8 +22,24 @@ end
 
 pg = PG.connect(config['database'])
 
-keywords = %w{ ios android ruby rails python javascript app web app application
-               api rest restful programmer automate automation unix linux shell
+keywords = %w{ ios
+               android
+               ruby
+               rails
+               python
+               javascript
+               app
+               web
+               application
+               api
+               rest
+               restful
+               programmer
+               automate
+               automation
+               unix
+               linux
+               shell
                script
              }
 
@@ -35,13 +51,13 @@ potential_leads = pg.exec_params(<<-SQL, [tsquery])
                                    FROM posts p,
                                         to_tsquery($1) query
                                    WHERE p.body_ts @@ query OR p.title_ts @@ query
-                                   ORDER BY ts_rank(title_ts, query) DESC, ts_rank(body_ts, query) DESC
+                                   ORDER BY ts_rank(title_ts, query, 32) DESC, ts_rank(body_ts, query, 32) DESC
                                  SQL
 
 formatted_data = potential_leads.map do |post|
   post_body = post['body'].to_s.sub(/^QR Code.*\n/, '').strip
 
-  <<-HTML.strip.gsub(/\s+/, ' ')
+  <<-HTML
     <p>
       <a href="#{post['url']}">#{post['title']}</a>
       <br />
@@ -59,7 +75,9 @@ Mail.deliver do
     content_type 'text/html; charset=UTF-8'
     body <<-HTML
            <h3>Daily Lead Digest</h3>
-           #{formatted_data.join}
+           <div style="max-width: 800px">
+             #{formatted_data.join("\n")}
+           </div>
          HTML
   end
 end
