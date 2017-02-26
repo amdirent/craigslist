@@ -4,23 +4,23 @@ require 'bundler'
 
 Bundler.require(:default, :qualifier)
 
-require 'yaml'
-
-root = File.expand_path(File.dirname(__FILE__))
-config = YAML.load_file(File.join(root, 'config.yml'))
-
 Mail.defaults do
   delivery_method :smtp, { address: 'smtp.gmail.com',
                            port: 587,
                            authentication: 'plain',
                            enable_starttls_auto: true,
-                           domain:    config['mail']['domain'],
-                           user_name: config['mail']['user'],
-                           password:  config['mail']['pass']
+                           domain:    ENV['MAIL_DOMAIN'],
+                           user_name: ENV['MAIL_USER'],
+                           password:  ENV['MAIL_PASS']
                          }
 end
 
-pg = PG.connect(config['database'])
+pg = PG.connect(host:     ENV['DATABASE_HOST'],
+                port:     ENV.fetch('DATABASE_PORT', 5432).to_i,
+                dbname:   ENV['DATABASE_NAME'],
+                user:     ENV['DATABASE_USER'],
+                password: ENV['DATABASE_PASS']
+               )
 
 keywords = %w{ ios
                android
