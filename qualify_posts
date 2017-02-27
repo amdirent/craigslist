@@ -56,6 +56,18 @@ potential_leads = pg.exec_params(<<-SQL, [tsquery])
                                    ORDER BY ts_rank(title_ts, query, 32) DESC, ts_rank(body_ts, query, 32) DESC
                                  SQL
 
+formatted_data = potential_leads.map do |post|
+  post_body = post['body'].to_s.sub(/^QR Code.*\n/, '').strip
+
+  <<-HTML
+    <p>
+      <a href="#{post['url']}">#{post['title']}</a>
+      <br />
+      #{post_body.gsub(/\s+/, ' ').slice(0, 255)}#{post_body.length > 255 ? '...' : ''}
+    </p>
+  HTML
+end
+
 require 'csv'
 
 csv_data = CSV.generate do |csv|
@@ -82,6 +94,9 @@ Mail.deliver do
              </tr>
            </table>
            <p>Attached CSV contains #{potential_leads.count} leads.  Ordered by search rank, highest first.</p>
+           <p style="max-width: 800px">
+             #{formatted_data.join("\n")}
+           </p>
          HTML
   end
 
