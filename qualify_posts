@@ -80,8 +80,8 @@ end
 today = Date.today
 
 Mail.deliver do
-  to 'crankin@amdirent.com'
-  cc 'chall@amdirent.com'
+  to 'anna@amdirent.com'
+  cc 'chall@amdirent.com, crankin@amdirent.com'
   from 'help@amdirent.com'
   subject "Craigslist Lead Digest for #{today.strftime('%a, %-d %b %Y')}"
 
