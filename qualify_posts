@@ -77,11 +77,13 @@ csv_data = CSV.generate do |csv|
   end
 end
 
+today = Date.today
+
 Mail.deliver do
   to 'crankin@amdirent.com'
   cc 'chall@amdirent.com'
   from 'help@amdirent.com'
-  subject "Craigslist Lead Digest for #{Date.today.strftime('%a, %-d %b %Y')}"
+  subject "Craigslist Lead Digest for #{today.strftime('%a, %-d %b %Y')}"
 
   html_part do
     content_type 'text/html; charset=UTF-8'
@@ -93,14 +95,14 @@ Mail.deliver do
                <td>#{keywords.join(', ')}</td>
              </tr>
            </table>
-           <p>Attached CSV contains #{potential_leads.count} leads.  Ordered by search rank, highest first.</p>
+           <p>#{potential_leads.count} potential leads; Ordered by search rank, highest first.</p>
            <p style="max-width: 800px">
              #{formatted_data.join("\n")}
            </p>
          HTML
   end
 
-  add_file filename: 'digest.csv',
+  add_file filename: "digest.#{today.iso8601}.csv",
            mime_type: 'text/csv',
            content: csv_data
 end
