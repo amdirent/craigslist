@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+p 'Starting posts qualifier'
+
 require 'bundler'
 
 Bundler.require(:default, :qualifier)
@@ -46,39 +48,46 @@ keywords = %w{ ios
 tsquery = keywords.join(' | ')
 
 potential_leads = pg.exec_params(<<-SQL, [tsquery])
-                                   SELECT p.url, p.title, p.body, p.contact_email, p.contact_phone
-                                   FROM (UPDATE posts SET processed = true WHERE NOT processed RETURNING *) p,
+                                   WITH newly_processed AS (UPDATE posts SET processed = true WHERE NOT processed RETURNING *)
+                                   SELECT p.id, p.url, p.title, p.body
+                                   FROM newly_processed p,
                                         to_tsquery($1) query
                                    WHERE p.body_ts @@ query OR p.title_ts @@ query
                                    ORDER BY ts_rank(title_ts, query, 32) DESC, ts_rank(body_ts, query, 32) DESC
                                  SQL
 
-formatted_data = potential_leads.map do |post|
-  post_body = post['body'].to_s.sub(/^QR Code.*\n/, '').strip
+require 'csv'
 
-  <<-HTML
-    <p>
-      <a href="#{post['url']}">#{post['title']}</a>
-      <br />
-      #{post_body.gsub(/\s+/, ' ').slice(0, 255)}#{post_body.length > 255 ? '...' : ''}
-    </p>
-  HTML
+csv_data = CSV.generate do |csv|
+  csv << ['id', 'url', 'title', 'is_relevant', 'notes']
+  potential_leads.each do |post|
+    csv << [post['id'], post['url'], post['title'], nil, nil]
+  end
 end
 
 Mail.deliver do
-  to 'chall@amdirent.com, crankin@amdirent.com'
+  to 'crankin@amdirent.com'
+  cc 'chall@amdirent.com'
   from 'help@amdirent.com'
   subject "Craigslist Lead Digest for #{Date.today.strftime('%a, %-d %b %Y')}"
 
   html_part do
     content_type 'text/html; charset=UTF-8'
     body <<-HTML
-           <h3>Daily Lead Digest</h3>
-           <div style="max-width: 800px">
-             <p>Keywords used: #{keywords.join(', ')}</p>
-             <br />
-             #{formatted_data.join("\n")}
-           </div>
+           <h2>Daily Lead Digest</h2>
+           <table>
+             <tr>
+               <th>Keywords used:</td>
+               <td>#{keywords.join(', ')}</td>
+             </tr>
+           </table>
+           <p>Attached CSV contains #{potential_leads.count} leads.  Ordered by search rank, highest first.</p>
          HTML
   end
+
+  add_file filename: 'digest.csv',
+           mime_type: 'text/csv',
+           content: csv_data
 end
+
+p 'Mail sent'
