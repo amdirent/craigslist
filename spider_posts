@@ -6,6 +6,13 @@ Bundler.require(:default)
 
 require_relative 'lib/spider'
 require_relative 'lib/scraper'
+require_relative 'lib/datadog'
+
+Datadog.emit_event("Scraper started for #{ARGV.join(',')}",
+                   msg_title: '[Craigslist Scraper] Scrape started',
+                   priority: 'low',
+                   tags: %w{ craigslist_scraper spider_posts } + ARGV.clone
+                  )
 
 Typhoeus::Config.user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
 
@@ -35,3 +42,9 @@ ARGV.each do |city_url|
     pg.exec_prepared('insert', [post_url, post_title, body, email, phone])
   end
 end
+
+Datadog.emit_event("Scraping complete for #{ARGV.join(',')}",
+                   msg_title: '[Craigslist Scraper] Scrape finished',
+                   alert_type: 'success',
+                   tags: %w{ craigslist_scraper spider_posts } + ARGV.clone
+                  )

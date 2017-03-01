@@ -6,6 +6,14 @@ require 'bundler'
 
 Bundler.require(:default, :qualifier)
 
+require_relative 'lib/datadog'
+
+Datadog.emit_event("Qualifying unprocessed posts",
+                   msg_title: '[Craigslist Scraper] Qualifier started',
+                   priority: 'low',
+                   tags: %w{ craigslist_scraper qualify_posts }
+                  )
+
 Mail.defaults do
   delivery_method :smtp, { address: 'smtp.gmail.com',
                            port: 587,
@@ -106,5 +114,11 @@ Mail.deliver do
            mime_type: 'text/csv',
            content: csv_data
 end
+
+Datadog.emit_event("Posts processed and qualified",
+                   msg_title: '[Craigslist Scraper] Qualifier finished',
+                   alert_type: 'success',
+                   tags: %w{ craigslist_scraper qualify_posts }
+                  )
 
 p 'Mail sent'
