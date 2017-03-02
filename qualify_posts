@@ -141,10 +141,22 @@ Mail.deliver do
            content: improved_csv
 end
 
-Datadog.emit_event("Posts processed and qualified",
-                   msg_title: '[Craigslist Scraper] Qualifier finished',
-                   alert_type: 'success',
-                   tags: %w{ craigslist_scraper qualify_posts }
-                  )
-
 p 'Mail sent'
+
+at_exit do
+  if $!
+    # Looks like an error occurred...
+
+    Datadog.emit_event($!.message,
+                       msg_title: '[Craigslist Scraper] An error occurred during qualification',
+                       alert_type: 'error',
+                       tags: %w{ craigslist_scraper qualify_posts }
+                      )
+  else
+    Datadog.emit_event("Posts processed and qualified",
+                       msg_title: '[Craigslist Scraper] Qualifier finished',
+                       alert_type: 'success',
+                       tags: %w{ craigslist_scraper qualify_posts }
+                      )
+  end
+end

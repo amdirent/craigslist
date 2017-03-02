@@ -44,8 +44,20 @@ ARGV.each do |city_url|
   end
 end
 
-Datadog.emit_event("Scraping complete for #{ARGV.join(',')}",
-                   msg_title: '[Craigslist Scraper] Scrape finished',
-                   alert_type: 'success',
-                   tags: %w{ craigslist_scraper spider_posts } + ARGV.clone
-                  )
+at_exit do
+  if $!
+    # Looks like an error occurred...
+
+    Datadog.emit_event($!.message,
+                       msg_title: '[Craigslist Scraper] An error occurred while spidering',
+                       alert_type: 'error',
+                       tags: %w{ craigslist_scraper spider_posts } + ARGV.clone
+                      )
+  else
+    Datadog.emit_event("Scraping complete for #{ARGV.join(',')}",
+                       msg_title: '[Craigslist Scraper] Scrape finished',
+                       alert_type: 'success',
+                       tags: %w{ craigslist_scraper spider_posts } + ARGV.clone
+                      )
+  end
+end
