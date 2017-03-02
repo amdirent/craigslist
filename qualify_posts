@@ -43,10 +43,8 @@ keywords = %w{ ios
                application
                api
                rest
-               restful
                programmer
                automate
-               automation
                unix
                linux
                shell
@@ -59,9 +57,9 @@ potential_leads = pg.exec_params(<<-SQL, [tsquery])
                                    WITH newly_processed AS (UPDATE posts SET processed = true WHERE NOT processed RETURNING *)
                                    SELECT p.id, p.url, p.title, p.body
                                    FROM newly_processed p,
-                                        to_tsquery($1) query
-                                   WHERE p.body_ts @@ query OR p.title_ts @@ query
-                                   ORDER BY ts_rank(title_ts, query, 32) DESC, ts_rank(body_ts, query, 32) DESC
+                                        to_tsquery('english', $1) kw_query
+                                   WHERE (p.body_ts @@ kw_query OR p.title_ts @@ kw_query)
+                                   ORDER BY ts_rank(title_ts, kw_query, 32) DESC, ts_rank(body_ts, kw_query, 32) DESC
                                  SQL
 
 formatted_data = potential_leads.map do |post|
@@ -99,11 +97,14 @@ Mail.deliver do
            <h2>Daily Lead Digest</h2>
            <table>
              <tr>
-               <th>Keywords used:</td>
+               <th>Keywords used:</th>
                <td>#{keywords.join(', ')}</td>
              </tr>
            </table>
-           <p>#{potential_leads.count} potential leads; Ordered by search rank, highest first.</p>
+           <p>
+             #{formatted_data.count} potential leads;
+             Ordered by search rank, highest first.
+           </p>
            <p style="max-width: 800px">
              #{formatted_data.join("\n")}
            </p>
