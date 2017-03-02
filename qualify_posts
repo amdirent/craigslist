@@ -51,9 +51,22 @@ keywords = %w{ ios
                script
              }
 
-tsquery = keywords.join(' | ')
+keyword_query = keywords.join(' | ')
 
-potential_leads = pg.exec_params(<<-SQL, [tsquery])
+bad_words_query = 'join | hire'
+
+better_filtering = pg.exec_params(<<-SQL, [keyword_query, bad_words_query])
+                                    SELECT p.id, p.url, p.title, p.body
+                                    FROM posts p,
+                                         to_tsquery('english', $1) kw_query,
+                                         to_tsquery('english', $2) bw_query
+                                    WHERE (p.body_ts @@ kw_query OR p.title_ts @@ kw_query)
+                                      AND NOT (p.body_ts @@ bw_query OR p.title_ts @@ bw_query)
+                                      AND NOT processed
+                                    ORDER BY ts_rank(title_ts, kw_query, 32) DESC, ts_rank(body_ts, kw_query, 32) DESC
+                                  SQL
+
+potential_leads = pg.exec_params(<<-SQL, [keyword_query])
                                    WITH newly_processed AS (UPDATE posts SET processed = true WHERE NOT processed RETURNING *)
                                    SELECT p.id, p.url, p.title, p.body
                                    FROM newly_processed p,
@@ -79,6 +92,14 @@ require 'csv'
 csv_data = CSV.generate do |csv|
   csv << ['id', 'url', 'title', 'is_relevant', 'notes']
   potential_leads.each do |post|
+    csv << [post['id'], post['url'], post['title'], nil, nil]
+  end
+end
+
+
+improved_csv = CSV.generate do |csv|
+  csv << ['id', 'url', 'title', 'is_relevant', 'notes']
+  better_filtering.each do |post|
     csv << [post['id'], post['url'], post['title'], nil, nil]
   end
 end
@@ -114,6 +135,10 @@ Mail.deliver do
   add_file filename: "digest.#{today.iso8601}.csv",
            mime_type: 'text/csv',
            content: csv_data
+
+  add_file filename: "improved-filter.#{today.iso8601}.csv",
+           mime_type: 'text/csv',
+           content: improved_csv
 end
 
 Datadog.emit_event("Posts processed and qualified",
