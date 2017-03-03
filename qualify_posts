@@ -60,8 +60,8 @@ better_filtering = pg.exec_params(<<-SQL, [keyword_query, bad_words_query])
                                     FROM posts p,
                                          to_tsquery('english', $1) kw_query,
                                          to_tsquery('english', $2) bw_query
-                                    WHERE (p.body_ts @@ kw_query OR p.title_ts @@ kw_query)
-                                      AND NOT (p.body_ts @@ bw_query OR p.title_ts @@ bw_query)
+                                    WHERE (p.body_ts || p.title_ts) @@ kw_query
+                                      AND NOT (p.body_ts || p.title_ts) @@ bw_query
                                       AND NOT processed
                                     ORDER BY ts_rank(title_ts, kw_query, 32) DESC, ts_rank(body_ts, kw_query, 32) DESC
                                   SQL
@@ -71,7 +71,7 @@ potential_leads = pg.exec_params(<<-SQL, [keyword_query])
                                    SELECT p.id, p.url, p.title, p.body
                                    FROM newly_processed p,
                                         to_tsquery('english', $1) kw_query
-                                   WHERE (p.body_ts @@ kw_query OR p.title_ts @@ kw_query)
+                                   WHERE (p.body_ts || p.title_ts) @@ kw_query
                                    ORDER BY ts_rank(title_ts, kw_query, 32) DESC, ts_rank(body_ts, kw_query, 32) DESC
                                  SQL
 
