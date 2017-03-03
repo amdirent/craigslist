@@ -32,9 +32,7 @@ pg = PG.connect(host:     ENV['DATABASE_HOST'],
                 password: ENV['DATABASE_PASS']
                )
 
-keywords = %w{ ios
-               android
-               ruby
+keywords = %w{ ruby
                rails
                python
                javascript
@@ -53,7 +51,29 @@ keywords = %w{ ios
 
 keyword_query = keywords.join(' | ')
 
-bad_words_query = 'join | hire'
+bad_words = %w{ join
+                hire
+                (full\ &\ time)
+                equity
+                intern
+                java
+                studio
+                chance
+                sell
+                seek
+                windows
+                wordpress
+                opportunity
+                tester
+                survey
+                tutor
+                cheap
+                independent
+                employee
+                download
+              }
+
+bad_words_query = bad_words.join(' | ')
 
 better_filtering = pg.exec_params(<<-SQL, [keyword_query, bad_words_query])
                                     SELECT p.id, p.url, p.title, p.body
