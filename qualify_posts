@@ -71,6 +71,10 @@ bad_words = %w{ join
                 independent
                 employee
                 download
+                marketing
+                (social\ &\ media)
+                teach
+                (customer\ &\ service)
               }
 
 bad_words_query = bad_words.join(' | ')
