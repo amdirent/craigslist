@@ -64,7 +64,6 @@ bad_words = %w{ join
                 sell
                 seek
                 windows
-                wordpress
                 opportunity
                 tester
                 survey
