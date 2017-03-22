@@ -1,0 +1,17 @@
+source 'https://rubygems.org'
+
+# Connection Pooling for threaded applications
+gem 'connection_pool', '~> 2.2'
+gem 'pg', '~> 0.19.0'
+
+# Email construction and parsing
+gem 'mail', '~>2.6.4'
+
+# Sending emails
+gem 'mandrill-api', '~> 1.0', '>= 1.0.53', require: 'mandrill'
+
+gem 'puma', '~> 3.8', '>= 3.8.2'
+
+# Markdown used for displaying post bodies
+gem 'redcarpet', '~> 3.4'
+gem 'sinatra', '~> 2.0.0.rc1', require: %w{ sinatra/base }

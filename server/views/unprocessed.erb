@@ -1,0 +1,44 @@
+<% if @unprocessed.nil? %>
+  <h2>No unprocessed entries</h2>
+  <a href='/'>Go Back</a>
+<% else %>
+  <h2><%= @unprocessed['title'] %></h2>
+  <div class='ui grid row'>
+    <div class='eight wide column'>
+      <%= markdown strip_qr_text(@unprocessed['body']) %>
+    </div>
+    <form class='eight wide column form ui'
+          method='POST'
+          action='/process/<%= @unprocessed['id'] %>'
+    >
+
+      <div class='field'>
+        <label>Subject</label>
+        <input name='email_subject',
+               placeholder='Subject'
+               value='<%= @unprocessed['title'] %>'
+        />
+      </div>
+
+      <div class='field'>
+        <label>From</label>
+        <input name='email_from'
+               placeholder='From:'
+               value='<%= @default_from %>'
+        />
+      </div>
+
+      <div class='field'>
+        <label>Body <small>(Markdown supported)</small></label>
+        <textarea class='field'
+                  name='email_body'
+                  placeholder='Type your email here [Markdown supported]'
+        ><%= EMAIL_TEMPLATE.strip %></textarea>
+      <% # TODO: Markdown preview %>
+      </div>
+
+      <button type='submit' name='good'>Good Entry</button>
+      <button type='submit' name='bad'>Bad Entry</button>
+    </form>
+  </div>
+<% end %>

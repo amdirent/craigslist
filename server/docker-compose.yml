@@ -1,0 +1,12 @@
+version: '2'
+
+services:
+  server:
+    build: .
+    image: amdirent/cl_server:latest
+    extra_hosts:
+      - 'dev:HOST_IP'
+    network_mode: 'host'
+    env_file: docker-compose.env
+    ports:
+      - '5000:5000'

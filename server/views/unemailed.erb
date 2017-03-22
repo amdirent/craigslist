@@ -1,0 +1,21 @@
+<% if @unemailed.nil? %>
+  <h2>No unemailed entries</h2>
+  <a href='/'>Go back</a>
+<% else %>
+  <h2><%= @unemailed['title'] %></h2>
+  <a target='_blank' href='<%= @unemailed['url'] %>'>Get reply info</a>
+  <div class='ui grid row'>
+    <form class='six wide column form ui'
+          method='POST'
+          action='/send-mail/<%= @unemailed['id'] %>'
+    >
+      <div class='field'>
+        <label>Send To</label>
+        <input name='email' placeholder='Send To' type='email' required />
+      </div>
+      
+      <button type='submit'>Send Email</button>
+      <button type='submit' name='invalid'>No Send Data</button>
+    </form>
+  </div>
+<% end %>
