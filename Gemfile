@@ -6,7 +6,7 @@ gem 'typhoeus', '~> 1.1.2'
 gem 'dogapi', '~> 1.25.0'
 
 group :qualifier do
-  gem 'mail', '~>2.6.4'
+  gem 'mandrill-api', '~> 1.0', '>= 1.0.53', require: 'mandrill'
 end
 
 group :development do

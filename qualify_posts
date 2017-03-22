@@ -14,16 +14,7 @@ Datadog.emit_event("Qualifying unprocessed posts",
                    tags: %w{ craigslist_scraper qualify_posts }
                   )
 
-Mail.defaults do
-  delivery_method :smtp, { address: 'smtp.gmail.com',
-                           port: 587,
-                           authentication: 'plain',
-                           enable_starttls_auto: true,
-                           domain:    ENV['MAIL_DOMAIN'],
-                           user_name: ENV['MAIL_USER'],
-                           password:  ENV['MAIL_PASS']
-                         }
-end
+mandrill = Mandrill::API.new(ENV['MANDRILL_API'])
 
 pg = PG.connect(host:     ENV['DATABASE_HOST'],
                 port:     ENV.fetch('DATABASE_PORT', 5432).to_i,
@@ -53,16 +44,10 @@ keywords = %w{ ios
 
 keyword_query = keywords.join(' | ')
 
-bad_words = %w{ join
-                hire
-                (full\ &\ time)
-                equity
+bad_words = %w{ (full\ &\ time)
                 intern
-                java
-                studio
                 chance
                 sell
-                seek
                 windows
                 opportunity
                 tester
@@ -73,7 +58,6 @@ bad_words = %w{ join
                 employee
                 download
                 marketing
-                (social\ &\ media)
                 teach
                 (customer\ &\ service)
                 (easy\ &\ money)
@@ -134,40 +118,47 @@ end
 
 today = Date.today
 
-Mail.deliver do
-  to 'anna@amdirent.com'
-  cc 'chall@amdirent.com, crankin@amdirent.com'
-  from 'help@amdirent.com'
-  subject "Craigslist Lead Digest for #{today.strftime('%a, %-d %b %Y')}"
+message_data = {
+  from_email: 'help@amdirent.com',
+  to: [
+    { email: 'chall@amdirent.com' },
+    { email: 'crankin@amdirent.com' }
+  ],
+  subject: "Craigslist Lead Digest for #{today.strftime('%a, %-d %b %Y')}",
 
-  html_part do
-    content_type 'text/html; charset=UTF-8'
-    body <<-HTML
-           <h2>Daily Lead Digest</h2>
-           <table>
-             <tr>
-               <th>Keywords used:</th>
-               <td>#{keywords.join(', ')}</td>
-             </tr>
-           </table>
-           <p>
-             #{formatted_data.count} potential leads;
-             Ordered by search rank, highest first.
-           </p>
-           <p style="max-width: 800px">
-             #{formatted_data.join("\n")}
-           </p>
-         HTML
-  end
+  html: <<-HTML,
+          <h2>Daily Lead Digest</h2>
+          <table>
+            <tr>
+              <th>Keywords used:</th>
+              <td>#{keywords.join(', ')}</td>
+            </tr>
+          </table>
+          <p>
+            #{formatted_data.count} potential leads;
+            Ordered by search rank, highest first.
+          </p>
+          <p style="max-width: 800px">
+            #{formatted_data.join("\n")}
+          </p>
+        HTML
 
-  add_file filename: "digest.#{today.iso8601}.csv",
-           mime_type: 'text/csv',
-           content: csv_data
+  attachments: [
+    { content: csv_data,
+      type: 'text/csv',
+      name: "digest.#{today.iso8601}.csv"
+    },
+    { content: improved_csv,
+      type: 'text/csv',
+      name: "improved-filter.#{today.iso8601}.csv"
+    }
+  ],
+  metadata: {
+    :'sent-from' => 'craigslist-qualfier'
+  }
+}
 
-  add_file filename: "improved-filter.#{today.iso8601}.csv",
-           mime_type: 'text/csv',
-           content: improved_csv
-end
+mandrill.messages.send(message_data, false)
 
 p 'Mail sent'
 
