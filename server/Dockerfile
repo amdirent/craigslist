@@ -16,5 +16,7 @@ COPY public/ public/
 COPY protected/ protected/
 COPY views/ views/
 
+EXPOSE 5000
+
 ENTRYPOINT ["bundle", "exec"]
 CMD ["puma -p 5000"]
