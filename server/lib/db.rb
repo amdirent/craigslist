@@ -21,21 +21,35 @@ class Craigslist
                          user: ENV['DATABASE_USER'],
                          password: ENV['DATABASE_PASS'])
 
+          # Checks for "NOT processed" are to exclude posts that were processed
+          # by the old qualifier
+
           c.prepare('fetch post',
-                    'SELECT * FROM posts WHERE id = $1')
+                    'SELECT *
+                     FROM posts
+                     WHERE id = $1')
 
           c.prepare('get first unprocessed',
-                    'SELECT id, title, body FROM posts
-                     WHERE potential_lead IS NULL AND body IS NOT NULL
-                     ORDER BY id LIMIT 1')
+                    'SELECT id, title, body
+                     FROM posts
+                     WHERE potential_lead IS NULL
+                     AND body IS NOT NULL
+                     AND NOT processed
+                     ORDER BY id
+                     LIMIT 1')
 
           c.prepare('get first unemailed',
-                    'SELECT id, url, title FROM posts
-                     WHERE NOT email_sent AND potential_lead
-                     ORDER BY id LIMIT 1')
+                    'SELECT id, url, title
+                     FROM posts
+                     WHERE NOT email_sent
+                     AND potential_lead
+                     ORDER BY id
+                     LIMIT 1')
 
           c.prepare('mark bad',
-                    'UPDATE posts SET potential_lead = false WHERE id = $1
+                    'UPDATE posts
+                     SET potential_lead = false
+                     WHERE id = $1
                      RETURNING id')
 
           c.prepare('mark good',
