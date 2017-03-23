@@ -1,6 +1,5 @@
 <% if @unprocessed.nil? %>
   <h2>No unprocessed entries</h2>
-  <a href='/'>Go Back</a>
 <% else %>
   <h2><%= @unprocessed['title'] %></h2>
   <div class='ui grid row'>
@@ -37,8 +36,12 @@
       <% # TODO: Markdown preview %>
       </div>
 
-      <button type='submit' name='good'>Good Entry</button>
-      <button type='submit' name='bad'>Bad Entry</button>
+      <div class='ui buttons'>
+        <button class='ui button' type='submit' name='good'>Good Entry</button>
+        <div class='or'></div>
+        <button class='ui button' type='submit' name='bad'>Bad Entry</button>
+      </div>
     </form>
   </div>
 <% end %>
+<a href='/' style='display: inline-block; margin-top: 1rem;'><i class='arrow left icon'></i> Go Back</a>
