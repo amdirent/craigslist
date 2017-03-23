@@ -1,0 +1,9 @@
+{
+  "AWSEBDockerrunVersion": 1,
+  "Image": {
+    "Name": "402239435993.dkr.ecr.us-east-1.amazonaws.com/craigslist-server:latest"
+  },
+  "Port": [
+    { "ContainerPort": 5000 }
+  ]
+}
