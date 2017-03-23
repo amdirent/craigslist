@@ -4,7 +4,7 @@ p 'Starting posts qualifier'
 
 require 'bundler'
 
-Bundler.require(:default, :qualifier)
+Bundler.require(:default)
 
 require_relative 'lib/datadog'
 
@@ -13,8 +13,6 @@ Datadog.emit_event("Qualifying unprocessed posts",
                    priority: 'low',
                    tags: %w{ craigslist_scraper qualify_posts }
                   )
-
-mandrill = Mandrill::API.new(ENV['MANDRILL_API'])
 
 pg = PG.connect(host:     ENV['DATABASE_HOST'],
                 port:     ENV.fetch('DATABASE_PORT', 5432).to_i,
@@ -44,123 +42,14 @@ keywords = %w{ ios
 
 keyword_query = keywords.join(' | ')
 
-bad_words = %w{ (full\ &\ time)
-                intern
-                chance
-                sell
-                windows
-                opportunity
-                tester
-                survey
-                tutor
-                cheap
-                independent
-                employee
-                download
-                marketing
-                teach
-                (customer\ &\ service)
-                (easy\ &\ money)
-                facebook
-                education
-              }
+pg.exec_params(<<-SQL, [keyword_query])
+                 UPDATE posts p
+                 SET potential_lead = false
+                 WHERE potential_lead IS NULL
+                 AND NOT ((p.body_ts || p.title_ts) @@ to_tsquery('english', $1))
+               SQL
 
-bad_words_query = bad_words.join(' | ')
-
-better_filtering = pg.exec_params(<<-SQL, [keyword_query, bad_words_query])
-                                    SELECT p.id, p.url, p.title, p.body
-                                    FROM posts p,
-                                         to_tsquery('english', $1) kw_query,
-                                         to_tsquery('english', $2) bw_query
-                                    WHERE (p.body_ts || p.title_ts) @@ kw_query
-                                      AND NOT (p.body_ts || p.title_ts) @@ bw_query
-                                      AND NOT processed
-                                    ORDER BY ts_rank(title_ts, kw_query, 32) DESC, ts_rank(body_ts, kw_query, 32) DESC
-                                  SQL
-
-potential_leads = pg.exec_params(<<-SQL, [keyword_query])
-                                   WITH newly_processed AS (UPDATE posts SET processed = true WHERE NOT processed RETURNING *)
-                                   SELECT p.id, p.url, p.title, p.body
-                                   FROM newly_processed p,
-                                        to_tsquery('english', $1) kw_query
-                                   WHERE (p.body_ts || p.title_ts) @@ kw_query
-                                   ORDER BY ts_rank(title_ts, kw_query, 32) DESC, ts_rank(body_ts, kw_query, 32) DESC
-                                 SQL
-
-formatted_data = potential_leads.map do |post|
-  post_body = post['body'].to_s.sub(/^QR Code.*\n/, '').strip
-
-  <<-HTML
-    <p>
-      <a href="#{post['url']}">#{post['title']}</a>
-      <br />
-      #{post_body.gsub(/\s+/, ' ').slice(0, 255)}#{post_body.length > 255 ? '...' : ''}
-    </p>
-  HTML
-end
-
-require 'csv'
-
-csv_data = CSV.generate do |csv|
-  csv << ['id', 'url', 'title', 'is_relevant', 'notes']
-  potential_leads.each do |post|
-    csv << [post['id'], post['url'], post['title'], nil, nil]
-  end
-end
-
-
-improved_csv = CSV.generate do |csv|
-  csv << ['id', 'url', 'title', 'is_relevant', 'notes']
-  better_filtering.each do |post|
-    csv << [post['id'], post['url'], post['title'], nil, nil]
-  end
-end
-
-today = Date.today
-
-message_data = {
-  from_email: 'help@amdirent.com',
-  to: [
-    { email: 'chall@amdirent.com' },
-    { email: 'crankin@amdirent.com' }
-  ],
-  subject: "Craigslist Lead Digest for #{today.strftime('%a, %-d %b %Y')}",
-
-  html: <<-HTML,
-          <h2>Daily Lead Digest</h2>
-          <table>
-            <tr>
-              <th>Keywords used:</th>
-              <td>#{keywords.join(', ')}</td>
-            </tr>
-          </table>
-          <p>
-            #{formatted_data.count} potential leads;
-            Ordered by search rank, highest first.
-          </p>
-          <p style="max-width: 800px">
-            #{formatted_data.join("\n")}
-          </p>
-        HTML
-
-  attachments: [
-    { content: csv_data,
-      type: 'text/csv',
-      name: "digest.#{today.iso8601}.csv"
-    },
-    { content: improved_csv,
-      type: 'text/csv',
-      name: "improved-filter.#{today.iso8601}.csv"
-    }
-  ],
-  metadata: {
-    :'sent-from' => 'craigslist-qualfier'
-  }
-}
-
-mandrill.messages.send(message_data, false)
-
-p 'Mail sent'
+p 'Qualifier finished'
 
 at_exit do
   if $!
