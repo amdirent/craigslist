@@ -4,6 +4,7 @@ require "uri"
 require "time"
 require "open-uri"
 require "nokogiri"
+require "httparty"
 require "thread/pool"
 
 module Craigslist
@@ -17,7 +18,7 @@ module Craigslist
     end
   end
 
-	def self.query_section(section, query, states)
+	def self.query_section(section, query, states, conf=nil)
     term = "#{section}?query=#{query.gsub(' ', '+')}&is_paid=all"
 		results = {}
 		base_url = 'https://geo.craigslist.org/iso/us/'
@@ -28,7 +29,8 @@ module Craigslist
 			pool.process {
 			  begin
           url = base_url + state
-          page = Nokogiri::HTML(open(url, :read_timeout=>nil))
+          #page = Nokogiri::HTML(open(url, :read_timeout=>nil))
+          page = Nokogiri::HTML(HTTParty.get(url, conf).body)
           page.css('ul.geo-site-list li a').each do |link|
             url = "#{link['href']}/search/#{term}"
             post = Nokogiri::HTML(open(url, :read_timeout=>nil))
@@ -50,38 +52,38 @@ module Craigslist
 		results
 	end
 
-  def self.extract_email(url)
-    uri = URI(url)
-    posting_id = url.split('/').last.split('.')[0]
-    page = Nokogiri::HTML(open("http://#{uri.host}/reply/#{posting_id}"))
-    page.css('a.mailto').text.strip
-  end
+  #def self.extract_email(url)
+  #  uri = URI(url)
+  #  posting_id = url.split('/').last.split('.')[0]
+  #  page = Nokogiri::HTML(open("http://#{uri.host}/reply/#{posting_id}"))
+  #  page.css('a.mailto').text.strip
+  #end
 
-	def self.parse_post(url)
-	  post = {}
+	#def self.parse_post(url)
+	#  post = {}
 
-    page = Nokogiri::HTML(open(url))
+  #  page = Nokogiri::HTML(open(url))
 
-    post[:posted_on] = DateTime.parse(page.css('p.postinginfo time')[0]['datetime'])
-    post[:posted_on] = Time.parse(page.css('time')[0]['datetime']).to_s
-    post[:title] = page.css('h2.postingtitle')[0].text.strip
-    post[:message] = page.css('section#postingbody').text.strip
-    post[:email] = extract_email(url).strip
-    post[:url] = url
+  #  post[:posted_on] = DateTime.parse(page.css('p.postinginfo time')[0]['datetime'])
+  #  post[:posted_on] = Time.parse(page.css('time')[0]['datetime']).to_s
+  #  post[:title] = page.css('h2.postingtitle')[0].text.strip
+  #  post[:message] = page.css('section#postingbody').text.strip
+  #  post[:email] = extract_email(url).strip
+  #  post[:url] = url
 
-    page.css('ul.blurbs').each do |li|
-      if li.text =~ /Location:/
-        loc = li.text.split("Location: ")[1]
-        post[:location] = Helper.instance.strip_tags(loc).strip
-      end
+  #  page.css('ul.blurbs').each do |li|
+  #    if li.text =~ /Location:/
+  #      loc = li.text.split("Location: ")[1]
+  #      post[:location] = Helper.instance.strip_tags(loc).strip
+  #    end
 
-      if li.text =~ /Compensation:/
-        comp = li.text.split("Compensation: ")[1]
-        post[:budget] = Helper.instance.strip_tags(comp).strip
-      end
-    end
+  #    if li.text =~ /Compensation:/
+  #      comp = li.text.split("Compensation: ")[1]
+  #      post[:budget] = Helper.instance.strip_tags(comp).strip
+  #    end
+  #  end
 
-    return post
-  end
+  #  return post
+  #end
 
 end
