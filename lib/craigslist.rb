@@ -4,6 +4,7 @@ require "uri"
 require "time"
 require "open-uri"
 require "nokogiri"
+require "thread/pool"
 
 module Craigslist
 
@@ -17,9 +18,9 @@ module Craigslist
   end
 
 	def self.query_section(section, query, states)
-		term = "#{section}?query=#{query.gsub(' ', '+')}&srchType=T"
+    term = "#{section}?query=#{query.gsub(' ', '+')}&is_paid=all"
 		results = {}
-		base_url = 'http://geo.craigslist.org/iso/us/'
+		base_url = 'https://geo.craigslist.org/iso/us/'
 		states ||= %w{al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms md mt ne nv nh nj nm ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy}
 
 		pool = Thread.pool(3)
@@ -28,12 +29,12 @@ module Craigslist
 			  begin
           url = base_url + state
           page = Nokogiri::HTML(open(url, :read_timeout=>nil))
-          page.css('div#list a').each do |link|
-            url = "#{link['href']}search/#{term}"
+          page.css('ul.geo-site-list li a').each do |link|
+            url = "#{link['href']}/search/#{term}"
             post = Nokogiri::HTML(open(url, :read_timeout=>nil))
-            post.css('p.row a').each do |plink|
+            post.css('p.result-info a').each do |plink|
               if plink['href'].include?('craigslist')
-                results[plink['href']] = plink.parent.text.strip
+                results[plink['href']] = plink.text.strip
               end
             end
           end
