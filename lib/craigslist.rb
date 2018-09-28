@@ -18,38 +18,52 @@ module Craigslist
     end
   end
 
-	def self.query_section(section, query, states, conf=nil)
-    term = "#{section}?query=#{query.gsub(' ', '+')}&is_paid=all"
-		results = {}
-		base_url = 'https://geo.craigslist.org/iso/us/'
-		states ||= %w{al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms md mt ne nv nh nj nm ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy}
+	def self.query_section(section, query, states, confs=nil)
+    	  term = "#{section}?query=#{query.gsub(' ', '+')}&is_paid=all"
+	  results = {}
+	  base_url = 'https://geo.craigslist.org/iso/us/'
+	  states ||= %w{al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms md mt ne nv nh nj nm ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy}
+	  rejects = []
+	  
+	  pool = Thread.pool(3)
+	  states.each do |state|
+	    pool.process {
+	      begin
+                url = base_url + state
+                #page = Nokogiri::HTML(open(url, :read_timeout=>nil))
 
-		pool = Thread.pool(3)
-		states.each do |state|
-			pool.process {
-			  begin
-          url = base_url + state
-          #page = Nokogiri::HTML(open(url, :read_timeout=>nil))
-          page = Nokogiri::HTML(HTTParty.get(url, conf).body)
-          page.css('ul.geo-site-list li a').each do |link|
-            url = "#{link['href']}/search/#{term}"
-            post = Nokogiri::HTML(open(url, :read_timeout=>nil))
-            post.css('p.result-info a').each do |plink|
-              if plink['href'].include?('craigslist')
-                results[plink['href']] = plink.text.strip
+	 	resp = HTTParty.get(url, confs[rand(5)])
+		if resp.code.to_s != "403"
+                  html = resp.body
+                  page = Nokogiri::HTML(html)
+                  page.css('ul.geo-site-list li a').each do |link|
+                    sleep 20 
+                    url = "#{link['href']}/search/#{term}"
+		    resp2 = HTTParty.get(url, confs[rand(5)])
+		    if resp2.code.to_s != "403"
+		      post = Nokogiri::HTML(resp2.body)
+                      post.css('p.result-info a').each do |plink|
+                        if plink['href'].include?('craigslist')
+                          results[plink['href']] = plink.text.strip
+                        end
+                      end
+                    else
+                      rejects.push(url)
+                    end
+		  end
+		else
+		  rejects.push(url) 
+                end
+              rescue OpenURI::HTTPError => e
+                puts e.message
+              rescue RuntimeError => e
+                puts e.message
               end
-            end
-          end
-        rescue OpenURI::HTTPError => e
-          puts e.message
-        rescue RuntimeError => e
-          puts e.message
-        end
-			}
-		end
+            }
+	  end
 
-		pool.shutdown
-		results
+          pool.shutdown
+          [results, rejects]
 	end
 
   #def self.extract_email(url)
